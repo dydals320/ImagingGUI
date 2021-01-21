@@ -1,5 +1,4 @@
-# ImagingGUI
-*** 
+# ImagingGUI - MATLAB code for communicating with a Arduino board and a camera
 
 #### The MATLAB GUI code in 'DaphniaGUI.m'. 
 #### - The code is specially written for Arduino MEGA and Thorlab CMOS USB Camera
