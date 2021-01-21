@@ -1,6 +1,6 @@
 # ImagingGUI
 
-#### The MATLAB GUI codee in 'DaphniaGUI.m'. 
+#### The MATLAB GUI code in 'DaphniaGUI.m'. 
 #### The code is specially written for Arduino MEGA and Thorlab CMOS USB Camera
 #### It uses the C++ API for Thorlab CMOS USB Camera. (https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=4024)
 
