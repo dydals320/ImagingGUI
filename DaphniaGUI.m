@@ -22,7 +22,7 @@ function varargout = DaphniaGUI(varargin)
 
 % Edit the above text to modify the response to help DaphniaGUI
 
-% Last Modified by GUIDE v2.5 10-Mar-2020 12:39:06
+% Last Modified by GUIDE v2.5 11-Jan-2021 22:35:37
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -56,7 +56,7 @@ function DaphniaGUI_OpeningFcn(hObject, eventdata, handles, varargin)
 
 %% Set initial parameters
 handles = setfield(handles, 'gain', 1);
-handles = setfield(handles, 'exposure', 5);
+handles = setfield(handles, 'exposure', 10);
 handles = setfield(handles, 'framerate', 25);
 handles = setfield(handles, 'pixelclock', 35);
 
@@ -74,7 +74,7 @@ handles = setfield(handles, 'vib_stim_off', 20);
 
 % Set stimulus magnitude & arduino ports
 handles = setfield(handles, 'light_level', 3);
-handles = setfield(handles, 'vib_level', 1);
+handles = setfield(handles, 'vib_level', 3);
 
 handles = setfield(handles,'top_light', 'D2');
 handles = setfield(handles,'bottom_light', 'D3');
@@ -85,6 +85,10 @@ handles = setfield(handles,'right_vib1', 'D8');
 handles = setfield(handles,'right_vib2', 'D9');
 handles = setfield(handles,'left_vib1', 'D10');
 handles = setfield(handles,'left_vib2', 'D11');
+
+handles = setfield(handles,'exposureNormal ', 10); %Off RoomLight 13
+handles = setfield(handles,'exposureWeakLight ', 8); % Off RoomLight 11
+handles = setfield(handles,'exposureStrongLight ', 7); % Off RoomLight 10
 
 handles.output = hObject;
 
@@ -132,7 +136,7 @@ function init_cam_Callback(hObject, eventdata, handles)
     % Change the first argument from 0 to camera ID to initialize a specific
     % camera, otherwise first camera found will be initialized
     %cam.Init(0, h.Handle);
-    cam.Init(0);
+    cam.Init(1);
 
     % Ensure Direct3D mode is set
     %cam.Display.Mode.Set(uc480.Defines.DisplayMode.Direct3D);
@@ -360,6 +364,7 @@ function DGui = video_filename(DGui)
     vid_num = get(DGui.vid_num,'String');
     date = datestr(today('datetime'));
     
+    
     expcond = DGui.expcond;
     
     if get(DGui.filename_control,'value') == 1
@@ -380,16 +385,16 @@ function DGui = video_filename(DGui)
         
         filename = [strNewDir filename '_' cohort_num '_' expcond '_' date];
         
-    elseif ischar(expcond) && ischar(get(DGui.filename_drugname,'string')) ...
-        && ischar(get(DGui.filename_drugdose,'string'))
-        
-        drug = get(DGui.filename_drugname,'string');
-        dose = get(DGui.filename_drugdose,'string');
-        filename = [strNewDir filename '_' cohort_num '_' drug ...
-            '_' dose '_' expcond '_' date];
+%     elseif ischar(expcond) && ischar(get(DGui.filename_drugname,'string')) ...
+%         && ischar(get(DGui.filename_drugdose,'string'))
+%         
+%         drug = get(DGui.filename_drugname,'string');
+%         dose = get(DGui.filename_drugdose,'string');
+%         filename = [strNewDir filename '_' cohort_num '_' drug ...
+%             '_' dose '_' expcond '_' date];
         
     else
-        filename = [strNewDir filename '_' cohort_num '_' date];
+        filename = [strNewDir filename '_' expcond '_' cohort_num '_' date];
     end
     
     new_filename = [filename '_' num2str(vid_num) '.avi'];
@@ -405,6 +410,7 @@ function save_directory_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of save_directory as text
 %        str2double(get(hObject,'String')) returns contents of save_directory as a double
+
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -436,7 +442,9 @@ function VideoRecording_Callback(hObject, eventdata, handles)
 % hObject    handle to VideoRecording (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
- 
+    
+    handles.expcond = 'Record';
+    
     status = 'Video recording start';
     set(handles.status_display,'String',status);
     set(handles.status_display,'ForegroundColor',[1, 0, 0]);
@@ -490,11 +498,10 @@ end
 
 function DGui = record_save(DGui)
      %Data.record_time = DGui.record_time;
-     Data.exposure = DGui.exposure;
-     Data.metadata = DGui.metadata;
-     
-     save([DGui.new_filename(1:end-4) '.mat'],...
-     'Data'); 
+%      Data = rmfield(DGui,'output');
+%      Data = rmfield(Data,'DaphniaGui');
+%      
+    % save([DGui.new_filename(1:end-4) '_Expinfo.mat'],'DGui'); 
 
     % Increment counter
     vid_num = str2double(get(DGui.vid_num,'string')) + 1;
@@ -1023,8 +1030,16 @@ function record_count_Callback(hObject, eventdata, handles)
 % hObject    handle to record_count (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+    fprintf('Start Record Video for Counting \n')
     handles.expcond = 'Count';
+    
+    %Stim. Parameters
+    ard = handles.ard;
+    port1 = handles.top_light;
+    volt = 5;
+    writePWMVoltage(ard, port1,volt);
+    exposure = handles.exposureStrongLight;
+    pause(15)
     
     status = 'Counting Mode Start';
     set(handles.status_display,'String',status);
@@ -1041,20 +1056,7 @@ function record_count_Callback(hObject, eventdata, handles)
     record_time = 20;
     filename = handles.new_filename;    
     
-    %Stim. Parameters
-    ard = handles.ard;
-    port1 = handles.top_light;
-    port2 = handles.bottom_light;
-    port3 = handles.left_light;
-    port4 = handles.right_light;
-    volt = 5;
-    
-    light_stim_on = handles.light_stim_on;
-    light_stim_off = handles.light_stim_off;
-    light_level = handles.light_level;
-    
-    
-    
+   
     if exist(filename)
         status = 'Same name file is exist';
         set(handles.status_display,'String',status);
@@ -1065,7 +1067,7 @@ function record_count_Callback(hObject, eventdata, handles)
         cam.IO.Flash.SetAutoFreerunEnable(true); 
         cam.Acquisition.Capture;
         cam.Video.Start(filename);
-        
+        cam.Timing.Exposure.Set(exposure);
         timestamp = tic;
         while toc(timestamp) <= 20
             
@@ -1077,19 +1079,19 @@ function record_count_Callback(hObject, eventdata, handles)
              axes(handles.axes1);
              imshow(I);            
              
-             if (toc(timestamp) >= light_stim_on && toc(timestamp) <= light_stim_off)
-                 writePWMVoltage(ard, port1,volt);
-                 writePWMVoltage(ard, port2,volt);
-                 writePWMVoltage(ard, port3,volt);
-                 writePWMVoltage(ard, port4,volt);
-             
-             elseif (toc(timestamp)> light_stim_off)
-                 writePWMVoltage(ard, port1, 0);
-                 writePWMVoltage(ard, port2, 0);
-                 writePWMVoltage(ard, port3, 0);
-                 writePWMVoltage(ard, port4, 0);
-             end
-             
+%              if (toc(timestamp) >= light_stim_on && toc(timestamp) <= light_stim_off)
+%                  writePWMVoltage(ard, port1,volt);
+%                  writePWMVoltage(ard, port2,volt);
+%                  writePWMVoltage(ard, port3,volt);
+%                  writePWMVoltage(ard, port4,volt);
+%              
+%              elseif (toc(timestamp)> light_stim_off)
+%                  writePWMVoltage(ard, port1, 0);
+%                  writePWMVoltage(ard, port2, 0);
+%                  writePWMVoltage(ard, port3, 0);
+%                  writePWMVoltage(ard, port4, 0);
+%              end
+%              
         end
 
         cam.Video.Stop();
@@ -1097,7 +1099,8 @@ function record_count_Callback(hObject, eventdata, handles)
 
         handles = record_save(handles);
     end
-    
+    writePWMVoltage(ard, port1,0);
+    fprintf('Done! \n')
     guidata(hObject,handles);
 end
 
@@ -1106,8 +1109,10 @@ function record_light_Callback(hObject, eventdata, handles)
 % hObject    handle to record_light (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+    %%
     
-    handles.expcond = 'Light';
+    %%
+    handles.expcond = 'light';
 
     status = 'Light Mode Start';
     set(handles.status_display,'String',status);
@@ -1116,12 +1121,14 @@ function record_light_Callback(hObject, eventdata, handles)
     handles = video_settings(handles);
     handles = video_filename(handles); 
     
+    exposureNormal = handles.exposureNormal;
+    exposureWeakLight = handles.exposureWeakLight;
+    exposureStrongLight = handles.exposureStrongLight;
+    
     cam = handles.cam;
     ID = handles.camera.ID;   
     Width = handles.camera.width;
     Height = handles.camera.height;
-    
-    
      
     record_time = handles.record_time;
     filename = handles.new_filename;    
@@ -1133,6 +1140,8 @@ function record_light_Callback(hObject, eventdata, handles)
     light_stim_on = handles.light_stim_on;
     light_stim_off = handles.light_stim_off;
     light_level = handles.light_level;
+    
+    exposure = handles.exposure;
     
     switch light_level
        case 1
@@ -1167,9 +1176,11 @@ function record_light_Callback(hObject, eventdata, handles)
              
              if (toc(timestamp) >= light_stim_on && toc(timestamp) <= light_stim_off)
                  writePWMVoltage(ard, port,volt);
+                 cam.Timing.Exposure.Set(exposureStrongLight);
                  
              elseif (toc(timestamp)> light_stim_off)
                  writePWMVoltage(ard, port, 0);
+                 cam.Timing.Exposure.Set(exposureNormal);
              end
              
         end
@@ -1223,7 +1234,7 @@ function record_vib_Callback(hObject, eventdata, handles)
        case 2
            volt = 3;
        case 3
-           volt = 5;
+           volt = 4;
     end
     
     if exist(filename)
@@ -1278,7 +1289,580 @@ function record_all_in_one_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
+%% Strong Light stimulus   
+    fprintf('Wait...\n'); 
+    pause(30)
+    
+    handles.expcond = 'light';
+    fprintf('Start to Record a Video for Behavioral responses to light \n')
+    
+    % Setting for auto recording 
+    record_time = 40;
+    
+    exposureNormal = handles.exposureNormal;
+    exposureWeakLight = handles.exposureWeakLight; % weak light stimulus
+    exposureStrongLight = handles.exposureStrongLight;   
+    
+    light_stim_on0 = 10;
+    light_stim_off0 = 30;
+    light_volt0 = 5;
+        
+    status = 'Light Mode Start';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+    
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+    
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+ 
+    filename = handles.new_filename;    
+
+    %Stim. Parameters
+    ard = handles.ard;
+    
+    % Light stimulus
+    port = handles.top_light;
+
+    light_level = handles.light_level;
+    
+    % Vib. stimulus
+    port1 = handles.right_vib1;
+    port2 = handles.right_vib2;
+    port3 = handles.left_vib1;
+    port4 = handles.left_vib2;
+    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+        x = input('Same name file is exist. Overwrite it?  ');
+    end 
+    
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+            
+        if toc(timestamp) < record_time
+             
+             cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+             
+             if toc(timestamp) < light_stim_on0
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) >= light_stim_on0  && toc(timestamp) < light_stim_off0)
+                writePWMVoltage(ard, port, light_volt0);
+                cam.Timing.Exposure.Set(exposureStrongLight);
+                
+             elseif (toc(timestamp) >= light_stim_off0)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+
+             end
+             
+        end
+        end
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+    handles = record_save(handles); 
+    
+    fprintf('Finished light stimulus experiment \n')
+
+    fprintf('Wait...\n'); 
+    pause(20);
+
+%% Weak Light, Strong light, Vib and Vib + weak light stim    
+    handles.expcond = 'Stim';
+    fprintf('Start to Record a Video for Behavioral responses \n')
+    
+    % Setting for auto recording 
+    record_time = 120;
+    
+    light_stim_on1 = 10;
+    light_stim_off1 = 20;
+    light_volt1 = 1;
+    
+    light_stim_on0 = 40;
+    light_stim_off0 = 50;
+    light_volt0 = 5;
+    
+    vib_stim_on = 70;
+    vib_stim_off = 80;
+    vib_volt = 4;
+
+    light_stim_on3 = 100;
+    light_stim_off3 = 110;
+    light_volt3 = 1;
+    
+    status = 'Auto Mode Start';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+    
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+    
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+ 
+    filename = handles.new_filename;    
+
+    %Stim. Parameters
+    ard = handles.ard;
+    
+    % Light stimulus
+    port = handles.top_light;
+
+    light_level = handles.light_level;
+    
+    % Vib. stimulus
+    port1 = handles.right_vib1;
+    port2 = handles.right_vib2;
+    port3 = handles.left_vib1;
+    port4 = handles.left_vib2;
+    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+        x = input('Same name file is exist. Overwrite it?  ');
+    end 
+    
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+            
+        if toc(timestamp) < record_time
+             
+             cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+             
+             if toc(timestamp) < light_stim_on1
+                cam.Timing.Exposure.Set(exposureNormal);             
+                
+             elseif (toc(timestamp) >= light_stim_on1 && toc(timestamp) < light_stim_off1)
+                writePWMVoltage(ard, port, light_volt1);
+                cam.Timing.Exposure.Set(exposureWeakLight);
+             
+             elseif (toc(timestamp) >= light_stim_off1 && toc(timestamp) < light_stim_on0)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) >= light_stim_on0 && toc(timestamp) < light_stim_off0)
+                writePWMVoltage(ard, port, light_volt0);
+                cam.Timing.Exposure.Set(exposureWeakLight);
+             
+             elseif (toc(timestamp) >= light_stim_off0 && toc(timestamp) < vib_stim_on)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) > vib_stim_on && toc(timestamp) < vib_stim_off)
+                 writePWMVoltage(ard, port1, vib_volt);
+                 writePWMVoltage(ard, port2, vib_volt);
+                 writePWMVoltage(ard, port3, vib_volt);
+                 writePWMVoltage(ard, port4, vib_volt);
+                 
+                 
+             elseif (toc(timestamp) > vib_stim_off && toc(timestamp) <= light_stim_on3)
+                 writePWMVoltage(ard, port1, 0);
+                 writePWMVoltage(ard, port2, 0);
+                 writePWMVoltage(ard, port3, 0);
+                 writePWMVoltage(ard, port4, 0);
+                 
+             elseif (toc(timestamp) > light_stim_on3 && toc(timestamp) <= light_stim_off3)
+                 writePWMVoltage(ard, port, light_volt3);
+                 cam.Timing.Exposure.Set(exposureWeakLight);
+                 
+             elseif (toc(timestamp) >  light_stim_off3)  
+                 writePWMVoltage(ard, port, 0);
+                 cam.Timing.Exposure.Set(exposureNormal);
+             end
+             
+        end
+        end
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+        handles = record_save(handles);
+
+    fprintf('Finish recording behavioral responses to stim! \n')
+
+%% Counting
+%     fprintf('Start Record Video for Counting \n')
+%     handles.expcond = 'Count';
+%     
+%     %Stim. Parameters
+%     ard = handles.ard;
+%     port1 = handles.top_light;
+%     volt = 5;
+%     writePWMVoltage(ard, port1,volt);
+%     pause(5)
+%     
+%     status = 'Counting Mode Start';
+%     set(handles.status_display,'String',status);
+%     set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+%     
+%     handles = video_settings(handles);
+%     handles = video_filename(handles); 
+%     
+%     cam = handles.cam;
+%     ID = handles.camera.ID;   
+%     Width = handles.camera.width;
+%     Height = handles.camera.height;
+%          
+%     record_time = 5;
+%     filename = handles.new_filename;    
+%     
+%    
+%     if exist(filename)
+%         status = 'Same name file is exist';
+%         set(handles.status_display,'String',status);
+%         set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+%         
+%     else
+%         cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+%         cam.IO.Flash.SetAutoFreerunEnable(true); 
+%         cam.Acquisition.Capture;
+%         cam.Video.Start(filename);
+%         cam.Timing.Exposure.Set(exposureStrongLight);
+%         timestamp = tic;
+%         while toc(timestamp) <= record_time
+%             
+%              cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+%              [err, I] = cam.Memory.CopyToArray(ID);
+% 
+%              I = reshape(uint8(I), Width, Height,[]).';
+%              % handles.Image = I;
+%              axes(handles.axes1);
+%              imshow(I);            
+%                         
+%         end
+% 
+%         cam.Video.Stop();
+%         cam.Acquisition.Stop();
+% 
+%         handles = record_save(handles);
+%     end
+%     writePWMVoltage(ard, port1,0);
+    
+
+%% Natural movement
+    pause(30)
+    fprintf('Start to record a video for the natural movement \n');
+    handles.expcond = 'Natural';
+    
+    status = 'Video recording start (Natural Movement)';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+     
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+    
+
+    light = get(handles.light_stim,'value');
+    vibration = get(handles.vib_stim,'value');
+    light_vib = get(handles.light_vib_stim,'value');
+    
+    record_time = 30;
+    filename = handles.new_filename;    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+    else
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        cam.Timing.Exposure.Set(exposureNormal);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+
+            cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+        end
+
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+        handles = record_save(handles);
+    end
+          
+
+%% Strong Light stimulus 2      
+    handles.expcond = 'light';
+    fprintf('Round 2: Start to Record a Video for Behavioral responses to light \n')
+    
+    % Setting for auto recording 
+    record_time = 40;
+    
+    exposureNormal = handles.exposureNormal;
+    exposureWeakLight = handles.exposureWeakLight; % weak light stimulus
+    exposureStrongLight = handles.exposureStrongLight;   
+    
+    light_stim_on0 = 10;
+    light_stim_off0 = 30;
+    light_volt0 = 5;
+    
+    status = 'Light Mode Start';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+    
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+    
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+ 
+    filename = handles.new_filename;    
+
+    %Stim. Parameters
+    ard = handles.ard;
+    
+    % Light stimulus
+    port = handles.top_light;
+
+    light_level = handles.light_level;
+    
+    % Vib. stimulus
+    port1 = handles.right_vib1;
+    port2 = handles.right_vib2;
+    port3 = handles.left_vib1;
+    port4 = handles.left_vib2;
+    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+        x = input('Same name file is exist. Overwrite it?  ');
+    end 
+    
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+            
+        if toc(timestamp) < record_time
+             
+             cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+             
+             if toc(timestamp) < light_stim_on0
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) >= light_stim_on0  && toc(timestamp) < light_stim_off0)
+                writePWMVoltage(ard, port, light_volt0);
+                cam.Timing.Exposure.Set(exposureStrongLight);
+                
+             elseif (toc(timestamp) >= light_stim_off0)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+
+             end
+             
+        end
+        end
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+    handles = record_save(handles); 
+    
+    fprintf('Finished light stimulus experiment \n')
+
+    fprintf('Wait...\n'); 
+    pause(20);  
+    
+%% Weak Light, Strong light, Vib and Vib + weak light stim    
+    handles.expcond = 'Stim';
+    fprintf('Round 2: Start to Record a Video for Behavioral responses \n')
+    
+    % Setting for auto recording 
+    record_time = 120;
+    
+    light_stim_on1 = 10;
+    light_stim_off1 = 20;
+    light_volt1 = 1;
+    
+    light_stim_on0 = 40;
+    light_stim_off0 = 50;
+    light_volt0 = 5;
+    
+    vib_stim_on = 70;
+    vib_stim_off = 80;
+    vib_volt = 4;
+    
+    light_stim_on3 = 100;
+    light_stim_off3 = 110;
+    light_volt3 = 1;
+    
+    status = 'Auto Mode Start';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+    
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+    
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+ 
+    filename = handles.new_filename;    
+
+    %Stim. Parameters
+    ard = handles.ard;
+    
+    % Light stimulus
+    port = handles.top_light;
+
+    light_level = handles.light_level;
+    
+    % Vib. stimulus
+    port1 = handles.right_vib1;
+    port2 = handles.right_vib2;
+    port3 = handles.left_vib1;
+    port4 = handles.left_vib2;
+    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+        x = input('Same name file is exist. Overwrite it?  ');
+    end 
+    
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+            
+        if toc(timestamp) < record_time
+             
+             cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+             
+             if toc(timestamp) < light_stim_on1
+                cam.Timing.Exposure.Set(exposureNormal);             
+                
+             elseif (toc(timestamp) >= light_stim_on1 && toc(timestamp) < light_stim_off1)
+                writePWMVoltage(ard, port, light_volt1);
+                cam.Timing.Exposure.Set(exposureWeakLight);
+             
+             elseif (toc(timestamp) >= light_stim_off1 && toc(timestamp) < light_stim_on0)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) >= light_stim_on0 && toc(timestamp) < light_stim_off0)
+                writePWMVoltage(ard, port, light_volt0);
+                cam.Timing.Exposure.Set(exposureWeakLight);
+             
+             elseif (toc(timestamp) >= light_stim_off0 && toc(timestamp) < vib_stim_on)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) > vib_stim_on && toc(timestamp) < vib_stim_off)
+                 writePWMVoltage(ard, port1, vib_volt);
+                 writePWMVoltage(ard, port2, vib_volt);
+                 writePWMVoltage(ard, port3, vib_volt);
+                 writePWMVoltage(ard, port4, vib_volt);
+                 
+                 
+             elseif (toc(timestamp) > vib_stim_off && toc(timestamp) <= light_stim_on3)
+                 writePWMVoltage(ard, port1, 0);
+                 writePWMVoltage(ard, port2, 0);
+                 writePWMVoltage(ard, port3, 0);
+                 writePWMVoltage(ard, port4, 0);
+                 
+             elseif (toc(timestamp) > light_stim_on3 && toc(timestamp) <= light_stim_off3)
+                 writePWMVoltage(ard, port, light_volt3);
+                 cam.Timing.Exposure.Set(exposureWeakLight);
+                 
+             elseif (toc(timestamp) >  light_stim_off3)  
+                 writePWMVoltage(ard, port, 0);
+                 cam.Timing.Exposure.Set(exposureNormal);
+             end
+             
+        end
+        end
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+        handles = record_save(handles);
+    
+    fprintf('Done! \n')
+
+    
+    status = 'Done!';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+    
+    
+    guidata(hObject,handles);
+
 end
+
 
 function memo_Callback(hObject, eventdata, handles)
 % hObject    handle to memo (see GCBO)
@@ -1364,7 +1948,7 @@ function vib_left_Callback(hObject, eventdata, handles)
            case 2
                volt = 3;
            case 3
-               volt = 5;
+               volt = 4;
        end
        writePWMVoltage(ard, port1,volt);
        writePWMVoltage(ard, port2,volt);
@@ -1405,7 +1989,7 @@ function vib_right_Callback(hObject, eventdata, handles)
            case 2
                volt = 3;
            case 3
-               volt = 5;
+               volt = 4;
        end
        writePWMVoltage(ard, port3,volt);
        writePWMVoltage(ard, port4,volt);
@@ -1503,8 +2087,9 @@ function filename_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of filename as text
 %        str2double(get(hObject,'String')) returns contents of filename as a double
-    handles.filename = str2double(get(hObject,'String'));
-    guidata(hObject, handles);
+    %handles.filename = str2double(get(hObject,'String'));
+    %handles.filename = (get(hObject,'String'));
+    %guidata(hObject, handles);
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -1687,4 +2272,1015 @@ function vid_num_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+end
+
+
+% --- Executes on button press in stimulus.
+function stimulus_Callback(hObject, eventdata, handles)
+% hObject    handle to stimulus (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+handles.expcond = 'Stim';
+    fprintf('Start to Record a Video for Behavioral responses \n')
+    
+    exposureNormal = handles.exposureNormal;
+    exposureWeakLight = handles.exposureWeakLight; % weak light stimulus
+    exposureStrongLight = handles.exposureStrongLight;   
+    
+    % Setting for auto recording 
+    record_time = 120;
+    
+    light_stim_on1 = 10;
+    light_stim_off1 = 20;
+    light_volt1 = 1;
+    
+    light_stim_on0 = 40;
+    light_stim_off0 = 50;
+    light_volt0 = 5;
+    
+    vib_stim_on = 70;
+    vib_stim_off = 80;
+    vib_volt = 4;
+
+    light_stim_on3 = 100;
+    light_stim_off3 = 110;
+    light_volt3 = 1;
+    
+    status = 'Stimulus (both light and vib) Mode Start';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+    
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+    
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+ 
+    filename = handles.new_filename;    
+
+    %Stim. Parameters
+    ard = handles.ard;
+    
+    % Light stimulus
+    port = handles.top_light;
+
+    light_level = handles.light_level;
+    
+    % Vib. stimulus
+    port1 = handles.right_vib1;
+    port2 = handles.right_vib2;
+    port3 = handles.left_vib1;
+    port4 = handles.left_vib2;
+    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+        x = input('Same name file is exist. Overwrite it?  ');
+    end 
+    
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+            
+        if toc(timestamp) < record_time
+             
+             cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+             
+             if toc(timestamp) < light_stim_on1
+                cam.Timing.Exposure.Set(exposureNormal);             
+                
+             elseif (toc(timestamp) >= light_stim_on1 && toc(timestamp) < light_stim_off1)
+                writePWMVoltage(ard, port, light_volt1);
+                cam.Timing.Exposure.Set(exposureWeakLight);
+             
+             elseif (toc(timestamp) >= light_stim_off1 && toc(timestamp) < light_stim_on0)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) >= light_stim_on0 && toc(timestamp) < light_stim_off0)
+                writePWMVoltage(ard, port, light_volt0);
+                cam.Timing.Exposure.Set(exposureWeakLight);
+             
+             elseif (toc(timestamp) >= light_stim_off0 && toc(timestamp) < vib_stim_on)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) > vib_stim_on && toc(timestamp) < vib_stim_off)
+                 writePWMVoltage(ard, port1, vib_volt);
+                 writePWMVoltage(ard, port2, vib_volt);
+                 writePWMVoltage(ard, port3, vib_volt);
+                 writePWMVoltage(ard, port4, vib_volt);
+                 
+                 
+             elseif (toc(timestamp) > vib_stim_off && toc(timestamp) <= light_stim_on3)
+                 writePWMVoltage(ard, port1, 0);
+                 writePWMVoltage(ard, port2, 0);
+                 writePWMVoltage(ard, port3, 0);
+                 writePWMVoltage(ard, port4, 0);
+                 
+             elseif (toc(timestamp) > light_stim_on3 && toc(timestamp) <= light_stim_off3)
+                 writePWMVoltage(ard, port, light_volt3);
+                 cam.Timing.Exposure.Set(exposureWeakLight);
+                 
+             elseif (toc(timestamp) >  light_stim_off3)  
+                 writePWMVoltage(ard, port, 0);
+                 cam.Timing.Exposure.Set(exposureNormal);
+             end
+             
+        end
+        end
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+        handles = record_save(handles);
+
+    fprintf('Finish recording behavioral responses to stim! \n')
+end
+
+
+% --- Executes on button press in repeat.
+function repeat_Callback(hObject, eventdata, handles)
+% hObject    handle to repeat (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+fileNum = 1;
+
+while fileNum < 300
+    fprintf('Round: %d \n', fileNum)
+%% Strong Light stimulus       
+    handles.expcond = 'light';
+    fprintf('Start to Record a Video for Behavioral responses to light \n')
+    
+    % Setting for auto recording 
+    record_time = 40;
+    
+    exposureNormal = handles.exposureNormal;
+    exposureWeakLight = handles.exposureWeakLight; % weak light stimulus
+    exposureStrongLight = handles.exposureStrongLight;   
+    
+    light_stim_on0 = 10;
+    light_stim_off0 = 30;
+    light_volt0 = 5;
+        
+    status = 'Light Mode Start';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+    
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+    
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+ 
+    filename = handles.new_filename;    
+
+    %Stim. Parameters
+    ard = handles.ard;
+    
+    % Light stimulus
+    port = handles.top_light;
+
+    light_level = handles.light_level;
+    
+    % Vib. stimulus
+    port1 = handles.right_vib1;
+    port2 = handles.right_vib2;
+    port3 = handles.left_vib1;
+    port4 = handles.left_vib2;
+    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+        x = input('Same name file is exist. Overwrite it?  ');
+    end 
+    
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+            
+        if toc(timestamp) < record_time
+             
+             cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+             
+             if toc(timestamp) < light_stim_on0
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) >= light_stim_on0  && toc(timestamp) < light_stim_off0)
+                writePWMVoltage(ard, port, light_volt0);
+                cam.Timing.Exposure.Set(exposureStrongLight);
+                
+             elseif (toc(timestamp) >= light_stim_off0)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+
+             end
+             
+        end
+        end
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+    handles = record_save(handles); 
+    
+    fprintf('Finished light stimulus experiment \n')
+
+    fprintf('Wait...\n'); 
+    pause(530);
+    %% Natural movement
+    fprintf('Start to record a video for the natural movement \n');
+    handles.expcond = 'Natural';
+    
+    status = 'Video recording start (Natural Movement)';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+     
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+    
+
+    light = get(handles.light_stim,'value');
+    vibration = get(handles.vib_stim,'value');
+    light_vib = get(handles.light_vib_stim,'value');
+    
+    record_time = 30;
+    filename = handles.new_filename;    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+    else
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        cam.Timing.Exposure.Set(exposureNormal);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+
+            cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+        end
+
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+        handles = record_save(handles);
+    end   
+
+%% Weak Light, Strong light, Vib and Vib + weak light stim    
+    handles.expcond = 'Stim';
+    fprintf('Start to Record a Video for Behavioral responses \n')
+    
+    % Setting for auto recording 
+    record_time = 120;
+    
+    light_stim_on1 = 10;
+    light_stim_off1 = 20;
+    light_volt1 = 1;
+    
+    light_stim_on0 = 40;
+    light_stim_off0 = 50;
+    light_volt0 = 5;
+    
+    vib_stim_on = 70;
+    vib_stim_off = 80;
+    vib_volt = 2.5;
+
+    light_stim_on3 = 100;
+    light_stim_off3 = 110;
+    light_volt3 = 1;
+    
+    status = 'Auto Mode Start';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+    
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+    
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+ 
+    filename = handles.new_filename;    
+
+    %Stim. Parameters
+    ard = handles.ard;
+    
+    % Light stimulus
+    port = handles.top_light;
+
+    light_level = handles.light_level;
+    
+    % Vib. stimulus
+    port1 = handles.right_vib1;
+    port2 = handles.right_vib2;
+    port3 = handles.left_vib1;
+    port4 = handles.left_vib2;
+    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+        x = input('Same name file is exist. Overwrite it?  ');
+    end 
+    
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+            
+        if toc(timestamp) < record_time
+             
+             cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+             
+             if toc(timestamp) < light_stim_on1
+                cam.Timing.Exposure.Set(exposureNormal);             
+                
+             elseif (toc(timestamp) >= light_stim_on1 && toc(timestamp) < light_stim_off1)
+                writePWMVoltage(ard, port, light_volt1);
+                cam.Timing.Exposure.Set(exposureWeakLight);
+             
+             elseif (toc(timestamp) >= light_stim_off1 && toc(timestamp) < light_stim_on0)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) >= light_stim_on0 && toc(timestamp) < light_stim_off0)
+                writePWMVoltage(ard, port, light_volt0);
+                cam.Timing.Exposure.Set(exposureWeakLight);
+             
+             elseif (toc(timestamp) >= light_stim_off0 && toc(timestamp) < vib_stim_on)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) > vib_stim_on && toc(timestamp) < vib_stim_off)
+                 writePWMVoltage(ard, port1, vib_volt);
+                 writePWMVoltage(ard, port2, vib_volt);
+                 writePWMVoltage(ard, port3, vib_volt);
+                 writePWMVoltage(ard, port4, vib_volt);
+                 
+                 
+             elseif (toc(timestamp) > vib_stim_off && toc(timestamp) <= light_stim_on3)
+                 writePWMVoltage(ard, port1, 0);
+                 writePWMVoltage(ard, port2, 0);
+                 writePWMVoltage(ard, port3, 0);
+                 writePWMVoltage(ard, port4, 0);
+                 
+             elseif (toc(timestamp) > light_stim_on3 && toc(timestamp) <= light_stim_off3)
+                 writePWMVoltage(ard, port, light_volt3);
+                 cam.Timing.Exposure.Set(exposureWeakLight);
+                 
+             elseif (toc(timestamp) >  light_stim_off3)  
+                 writePWMVoltage(ard, port, 0);
+                 cam.Timing.Exposure.Set(exposureNormal);
+             end
+             
+        end
+        end
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+        handles = record_save(handles);
+
+    fprintf('Finish recording behavioral responses to stim! \n')
+    pause(480)
+    fileNum = fileNum + 1;
+end
+end
+
+
+% --- Executes on button press in all_in_one_short.
+function all_in_one_short_Callback(hObject, eventdata, handles)
+% hObject    handle to all_in_one_short (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    
+fprintf('Wait...\n');     
+pause(15)
+
+exposureNormal = handles.exposureNormal;
+exposureWeakLight = handles.exposureWeakLight; % weak light stimulus
+exposureStrongLight = handles.exposureStrongLight;      
+
+%% Natural movement
+ 
+    fprintf('Start to record a video for the natural movement \n');
+    handles.expcond = 'Natural';
+
+    status = 'Video recording start (Natural Movement)';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+     
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+    
+
+    light = get(handles.light_stim,'value');
+    vibration = get(handles.vib_stim,'value');
+    light_vib = get(handles.light_vib_stim,'value');
+    
+    record_time = 30;
+    filename = handles.new_filename;    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+    else
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        cam.Timing.Exposure.Set(exposureNormal);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+
+            cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+        end
+
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+        handles = record_save(handles);
+    end
+          
+
+%% Strong Light stimulus   
+%     
+%     handles.expcond = 'light';
+%     fprintf('Start to Record a Video for Behavioral responses to light \n')
+%     
+%     % Setting for auto recording 
+%     record_time = 40;
+%     
+%     light_stim_on0 = 10;
+%     light_stim_off0 = 30;
+%     light_volt0 = 5;
+%         
+%     status = 'Light Mode Start';
+%     set(handles.status_display,'String',status);
+%     set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+%     
+%     handles = video_settings(handles);
+%     handles = video_filename(handles); 
+%     
+%     cam = handles.cam;
+%     ID = handles.camera.ID;   
+%     Width = handles.camera.width;
+%     Height = handles.camera.height;
+%  
+%     filename = handles.new_filename;    
+% 
+%     %Stim. Parameters
+%     ard = handles.ard;
+%     
+%     % Light stimulus
+%     port = handles.top_light;
+% 
+%     light_level = handles.light_level;
+%     
+%     % Vib. stimulus
+%     port1 = handles.right_vib1;
+%     port2 = handles.right_vib2;
+%     port3 = handles.left_vib1;
+%     port4 = handles.left_vib2;
+%     
+%     
+%     if exist(filename)
+%         status = 'Same name file is exist';
+%         set(handles.status_display,'String',status);
+%         set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+%         
+%         x = input('Same name file is exist. Overwrite it?  ');
+%     end 
+%     
+%         cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+%         cam.IO.Flash.SetAutoFreerunEnable(true); 
+%         cam.Acquisition.Capture;
+%         cam.Video.Start(filename);
+%         
+%         timestamp = tic;
+%         while toc(timestamp) <= record_time
+%             
+%         if toc(timestamp) < record_time
+%              
+%              cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+%              [err, I] = cam.Memory.CopyToArray(ID);
+% 
+%              I = reshape(uint8(I), Width, Height,[]).';
+%              % handles.Image = I;
+%              axes(handles.axes1);
+%              imshow(I);            
+%              
+%              if toc(timestamp) < light_stim_on0
+%                 cam.Timing.Exposure.Set(exposureNormal);
+%                 
+%              elseif (toc(timestamp) >= light_stim_on0  && toc(timestamp) < light_stim_off0)
+%                 writePWMVoltage(ard, port, light_volt0);
+%                 cam.Timing.Exposure.Set(exposureStrongLight);
+%                 
+%              elseif (toc(timestamp) >= light_stim_off0)
+%                 writePWMVoltage(ard, port, 0);
+%                 cam.Timing.Exposure.Set(exposureNormal);
+% 
+%              end
+%              
+%         end
+%         end
+%         cam.Video.Stop();
+%         cam.Acquisition.Stop();
+% 
+%     handles = record_save(handles); 
+%     
+%     fprintf('Finished light stimulus experiment \n')
+% 
+%     fprintf('Wait...\n'); 
+%     pause(20);
+
+%% Weak Light, Strong light, Vib and Vib + weak light stim    
+    handles.expcond = 'Stim';
+    fprintf('Start to Record a Video for Behavioral responses \n')
+    
+    % Setting for auto recording 
+    record_time = 120;
+    
+    light_stim_on1 = 10;
+    light_stim_off1 = 20;
+    light_volt1 = 1;
+    
+    light_stim_on0 = 40;
+    light_stim_off0 = 50;
+    light_volt0 = 5;
+    
+    vib_stim_on = 70;
+    vib_stim_off = 80;
+    vib_volt = 4;
+
+    light_stim_on3 = 100;
+    light_stim_off3 = 110;
+    light_volt3 = 1;
+    
+    status = 'Auto Mode Start';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+    
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+    
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+ 
+    filename = handles.new_filename;    
+
+    %Stim. Parameters
+    ard = handles.ard;
+    
+    % Light stimulus
+    port = handles.top_light;
+
+    light_level = handles.light_level;
+    
+    % Vib. stimulus
+    port1 = handles.right_vib1;
+    port2 = handles.right_vib2;
+    port3 = handles.left_vib1;
+    port4 = handles.left_vib2;
+    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+        x = input('Same name file is exist. Overwrite it?  ');
+    end 
+    
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+            
+        if toc(timestamp) < record_time
+             
+             cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+             
+             if toc(timestamp) < light_stim_on1
+                cam.Timing.Exposure.Set(exposureNormal);             
+                
+             elseif (toc(timestamp) >= light_stim_on1 && toc(timestamp) < light_stim_off1)
+                writePWMVoltage(ard, port, light_volt1);
+                cam.Timing.Exposure.Set(exposureWeakLight);
+             
+             elseif (toc(timestamp) >= light_stim_off1 && toc(timestamp) < light_stim_on0)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) >= light_stim_on0 && toc(timestamp) < light_stim_off0)
+                writePWMVoltage(ard, port, light_volt0);
+                cam.Timing.Exposure.Set(exposureWeakLight);
+             
+             elseif (toc(timestamp) >= light_stim_off0 && toc(timestamp) < vib_stim_on)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) > vib_stim_on && toc(timestamp) < vib_stim_off)
+                 writePWMVoltage(ard, port1, vib_volt);
+                 writePWMVoltage(ard, port2, vib_volt);
+                 writePWMVoltage(ard, port3, vib_volt);
+                 writePWMVoltage(ard, port4, vib_volt);
+                 
+                 
+             elseif (toc(timestamp) > vib_stim_off && toc(timestamp) <= light_stim_on3)
+                 writePWMVoltage(ard, port1, 0);
+                 writePWMVoltage(ard, port2, 0);
+                 writePWMVoltage(ard, port3, 0);
+                 writePWMVoltage(ard, port4, 0);
+                 
+             elseif (toc(timestamp) > light_stim_on3 && toc(timestamp) <= light_stim_off3)
+                 writePWMVoltage(ard, port, light_volt3);
+                 cam.Timing.Exposure.Set(exposureWeakLight);
+                 
+             elseif (toc(timestamp) >  light_stim_off3)  
+                 writePWMVoltage(ard, port, 0);
+                 cam.Timing.Exposure.Set(exposureNormal);
+             end
+             
+        end
+        end
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+        handles = record_save(handles);
+
+    fprintf('Finish recording behavioral responses to stim! \n')
+    fprintf('Done!\n'); 
+end
+
+
+% --- Executes on button press in pushbutton19.
+function pushbutton19_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton19 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+fprintf('Wait...\n');     
+pause(30)
+
+
+
+exposureNormal = handles.exposureNormal;
+exposureWeakLight = handles.exposureWeakLight; % weak light stimulus
+exposureStrongLight = handles.exposureStrongLight;      
+
+
+%% Normal Video (30s)
+handles.expcond = 'Natural';
+    
+    status = 'Video recording start';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+     
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+    
+    light = get(handles.light_stim,'value');
+    vibration = get(handles.vib_stim,'value');
+    light_vib = get(handles.light_vib_stim,'value');
+    
+    record_time = 30;
+    filename = handles.new_filename;    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+    else
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+
+            cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+        end
+
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+        handles = record_save(handles);
+    end
+    
+    guidata(hObject,handles);
+
+%% Strong Light stimulus   
+    
+    handles.expcond = 'light';
+    fprintf('Start to Record a Video for Behavioral responses to light \n')
+    
+    % Setting for auto recording 
+    record_time = 40;
+    
+    light_stim_on0 = 10;
+    light_stim_off0 = 30;
+    light_volt0 = 5;
+        
+    status = 'Light Mode Start';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+    
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+    
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+ 
+    filename = handles.new_filename;    
+
+    %Stim. Parameters
+    ard = handles.ard;
+    
+    % Light stimulus
+    port = handles.top_light;
+
+    light_level = handles.light_level;
+    
+    % Vib. stimulus
+    port1 = handles.right_vib1;
+    port2 = handles.right_vib2;
+    port3 = handles.left_vib1;
+    port4 = handles.left_vib2;
+    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+        x = input('Same name file is exist. Overwrite it?  ');
+    end 
+    
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+            
+        if toc(timestamp) < record_time
+             
+             cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+             
+             if toc(timestamp) < light_stim_on0
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) >= light_stim_on0  && toc(timestamp) < light_stim_off0)
+                writePWMVoltage(ard, port, light_volt0);
+                cam.Timing.Exposure.Set(exposureStrongLight);
+                
+             elseif (toc(timestamp) >= light_stim_off0)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+
+             end
+             
+        end
+        end
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+    handles = record_save(handles); 
+    
+    fprintf('Finished light stimulus experiment \n')
+
+    fprintf('Wait...\n'); 
+    pause(20);
+
+%% Weak Light, Strong light, Vib and Vib + weak light stim    
+    handles.expcond = 'Stim';
+    fprintf('Start to Record a Video for Behavioral responses \n')
+    
+    % Setting for auto recording 
+    record_time = 120;
+    
+    light_stim_on1 = 10;
+    light_stim_off1 = 20;
+    light_volt1 = 1;
+    
+    light_stim_on0 = 40;
+    light_stim_off0 = 50;
+    light_volt0 = 5;
+    
+    vib_stim_on = 70;
+    vib_stim_off = 80;
+    vib_volt = 4;
+
+    light_stim_on3 = 100;
+    light_stim_off3 = 110;
+    light_volt3 = 1;
+    
+    status = 'Auto Mode Start';
+    set(handles.status_display,'String',status);
+    set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+    
+    handles = video_settings(handles);
+    handles = video_filename(handles); 
+    
+    cam = handles.cam;
+    ID = handles.camera.ID;   
+    Width = handles.camera.width;
+    Height = handles.camera.height;
+ 
+    filename = handles.new_filename;    
+
+    %Stim. Parameters
+    ard = handles.ard;
+    
+    % Light stimulus
+    port = handles.top_light;
+
+    light_level = handles.light_level;
+    
+    % Vib. stimulus
+    port1 = handles.right_vib1;
+    port2 = handles.right_vib2;
+    port3 = handles.left_vib1;
+    port4 = handles.left_vib2;
+    
+    
+    if exist(filename)
+        status = 'Same name file is exist';
+        set(handles.status_display,'String',status);
+        set(handles.status_display,'ForegroundColor',[1, 0, 0]);
+        
+        x = input('Same name file is exist. Overwrite it?  ');
+    end 
+    
+        cam.PixelFormat.Set(uc480.Defines.ColorMode.Mono8);
+        cam.IO.Flash.SetAutoFreerunEnable(true); 
+        cam.Acquisition.Capture;
+        cam.Video.Start(filename);
+        
+        timestamp = tic;
+        while toc(timestamp) <= record_time
+            
+        if toc(timestamp) < record_time
+             
+             cam.DirectRenderer.StealNextFrame(uc480.Defines.DeviceParameter.Wait);
+             [err, I] = cam.Memory.CopyToArray(ID);
+
+             I = reshape(uint8(I), Width, Height,[]).';
+             % handles.Image = I;
+             axes(handles.axes1);
+             imshow(I);            
+             
+             if toc(timestamp) < light_stim_on1
+                cam.Timing.Exposure.Set(exposureNormal);             
+                
+             elseif (toc(timestamp) >= light_stim_on1 && toc(timestamp) < light_stim_off1)
+                writePWMVoltage(ard, port, light_volt1);
+                cam.Timing.Exposure.Set(exposureWeakLight);
+             
+             elseif (toc(timestamp) >= light_stim_off1 && toc(timestamp) < light_stim_on0)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) >= light_stim_on0 && toc(timestamp) < light_stim_off0)
+                writePWMVoltage(ard, port, light_volt0);
+                cam.Timing.Exposure.Set(exposureWeakLight);
+             
+             elseif (toc(timestamp) >= light_stim_off0 && toc(timestamp) < vib_stim_on)
+                writePWMVoltage(ard, port, 0);
+                cam.Timing.Exposure.Set(exposureNormal);
+                
+             elseif (toc(timestamp) > vib_stim_on && toc(timestamp) < vib_stim_off)
+                 writePWMVoltage(ard, port1, vib_volt);
+                 writePWMVoltage(ard, port2, vib_volt);
+                 writePWMVoltage(ard, port3, vib_volt);
+                 writePWMVoltage(ard, port4, vib_volt);
+                 
+                 
+             elseif (toc(timestamp) > vib_stim_off && toc(timestamp) <= light_stim_on3)
+                 writePWMVoltage(ard, port1, 0);
+                 writePWMVoltage(ard, port2, 0);
+                 writePWMVoltage(ard, port3, 0);
+                 writePWMVoltage(ard, port4, 0);
+                 
+             elseif (toc(timestamp) > light_stim_on3 && toc(timestamp) <= light_stim_off3)
+                 writePWMVoltage(ard, port, light_volt3);
+                 cam.Timing.Exposure.Set(exposureWeakLight);
+                 
+             elseif (toc(timestamp) >  light_stim_off3)  
+                 writePWMVoltage(ard, port, 0);
+                 cam.Timing.Exposure.Set(exposureNormal);
+             end
+             
+        end
+        end
+        cam.Video.Stop();
+        cam.Acquisition.Stop();
+
+        handles = record_save(handles);
+
+    fprintf('Finish recording behavioral responses to stim! \n')
+    fprintf('Done!\n'); 
 end
